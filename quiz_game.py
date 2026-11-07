@@ -21,6 +21,7 @@ class QuizGame:
         (4, "점수 확인"),
         (0, "종료"),
     )
+    POINTS_PER_QUESTION = 10
 
     def __init__(self, state_file=STATE_FILE):
         self.state_file = Path(state_file)
@@ -85,14 +86,38 @@ class QuizGame:
             else:
                 print(f"  [X] 오답입니다. 정답은 {quiz.answer}번 ({quiz.correct_choice()}) 입니다.")
 
-        self.show_result(correct_count, total)
+        score = correct_count * self.POINTS_PER_QUESTION
+        self.show_result(correct_count, total, score)
+        self.update_best_score(score)
 
-    def show_result(self, correct_count, total):
+    def show_result(self, correct_count, total, score):
         """퀴즈를 모두 푼 뒤 결과를 출력한다."""
         print("\n========== 결과 ==========")
         print(f"  맞힌 문제: {correct_count} / {total}")
         print(f"  정답률   : {correct_count / total * 100:.0f}%")
+        print(f"  점수     : {score}점")
         print("==========================")
+
+    def update_best_score(self, score):
+        """이번 점수를 최고 점수와 비교해 더 높으면 갱신하고 파일에 저장한다."""
+        if self.best_score is None or score > self.best_score:
+            previous = self.best_score
+            self.best_score = score
+            if previous is None:
+                print(f"[안내] 첫 기록! 최고 점수가 {score}점으로 저장되었습니다.")
+            else:
+                print(f"[안내] 최고 점수 갱신! {previous}점 -> {score}점")
+        else:
+            print(f"[안내] 현재 최고 점수는 {self.best_score}점입니다.")
+        self.save_state()
+
+    def show_score(self):
+        """저장된 최고 점수를 보여준다."""
+        print("\n=== 점수 확인 ===")
+        if self.best_score is None:
+            print("[안내] 아직 퀴즈를 풀지 않았습니다. '퀴즈 풀기'로 도전해 보세요!")
+            return
+        print(f"  최고 점수: {self.best_score}점 (문제당 {self.POINTS_PER_QUESTION}점)")
 
     def add_quiz(self):
         """문제, 선택지 4개, 정답 번호를 입력받아 새 퀴즈를 등록하고 파일에 저장한다."""
@@ -134,8 +159,6 @@ class QuizGame:
             quiz.display(number)
             print(f"  -> 정답: {quiz.answer}번")
 
-    def show_score(self):
-        print("[안내] 점수 확인 기능은 준비 중입니다.")
 
     # ------------------------------------------------------------ 입력 처리
     def read_number(self, prompt, minimum, maximum):
