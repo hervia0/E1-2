@@ -1,6 +1,7 @@
 """게임 전체 흐름을 관리하는 QuizGame 클래스."""
 
 import random
+from datetime import datetime
 
 from console_input import ConsoleInput
 from default_quizzes import create_default_quizzes
@@ -23,6 +24,7 @@ class QuizGame:
         self.console = console or ConsoleInput()
         self.quizzes = []
         self.best_score = None  # 아직 퀴즈를 풀지 않았으면 None
+        self.history = []  # 게임 1회 = {"played_at", "total", "correct", "hints_used", "score"}
         self.running = True
         # (메뉴 번호, 이름, 실행할 메서드) - 메뉴를 추가할 때 여기만 고치면 된다.
         self.menu_items = [
@@ -31,6 +33,7 @@ class QuizGame:
             (3, "퀴즈 목록", self.list_quizzes),
             (4, "점수 확인", self.show_score),
             (5, "퀴즈 삭제", self.delete_quiz),
+            (6, "게임 기록", self.show_history),
             (0, "종료", self.quit),
         ]
 
@@ -100,7 +103,8 @@ class QuizGame:
                 score += self.question_points(used_hint)
 
         self.show_result(correct_count, total, hints_used, score)
-        self.update_best_score(score)
+        self.record_history(total, correct_count, hints_used, score)
+        self.update_best_score(score)  # 최고 점수 비교 후 기록과 함께 저장
 
     def ask_question(self, quiz, number):
         """문제 하나를 출제하고 (정답 여부, 힌트 사용 여부)를 반환한다."""
@@ -159,6 +163,18 @@ class QuizGame:
             print(f"[안내] 현재 최고 점수는 {self.best_score}점입니다.")
         self.save_state()
 
+    def record_history(self, total, correct_count, hints_used, score):
+        """게임 1회의 결과를 날짜/시간과 함께 기록 목록에 추가한다."""
+        self.history.append(
+            {
+                "played_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "total": total,
+                "correct": correct_count,
+                "hints_used": hints_used,
+                "score": score,
+            }
+        )
+
     def show_score(self):
         """저장된 최고 점수를 보여준다."""
         print("\n=== 점수 확인 ===")
@@ -169,6 +185,22 @@ class QuizGame:
             f"  최고 점수: {self.best_score}점 "
             f"(문제당 {self.POINTS_PER_QUESTION}점, 힌트 사용 시 -{self.HINT_PENALTY}점)"
         )
+        if self.history:
+            print(f"  플레이 횟수: {len(self.history)}회 (자세한 내용은 '게임 기록' 메뉴)")
+
+    def show_history(self):
+        """지금까지의 모든 게임 기록을 오래된 순서로 보여준다."""
+        print("\n=== 게임 기록 ===")
+        if not self.history:
+            print("[안내] 아직 게임 기록이 없습니다.")
+            return
+        # 한글은 화면에서 2칸을 차지하므로 머리글은 칸 수를 맞춘 고정 문자열로 출력한다.
+        print("   No  날짜/시간            문제수  정답  힌트  점수")
+        for number, record in enumerate(self.history, start=1):
+            print(
+                f"  {number:>3}  {record['played_at']:<19}  {record['total']:>6}  "
+                f"{record['correct']:>4}  {record['hints_used']:>4}  {record['score']:>4}"
+            )
 
     # ------------------------------------------------------------ 퀴즈 관리
     def add_quiz(self):
@@ -274,8 +306,23 @@ class QuizGame:
         if best_score is not None and not self.is_valid_score(best_score):
             raise ValueError("best_score 값이 올바르지 않습니다.")
 
+        # history는 나중에 추가된 항목이므로, 예전 state.json에 없으면 빈 목록으로 둔다.
+        history = data.get("history", [])
+        if not isinstance(history, list) or not all(self.is_valid_record(r) for r in history):
+            raise ValueError("history 항목의 형식이 올바르지 않습니다.")
+
         self.quizzes = quizzes
         self.best_score = best_score
+        self.history = history
+
+    @classmethod
+    def is_valid_record(cls, record):
+        if not isinstance(record, dict) or not isinstance(record.get("played_at"), str):
+            return False
+        return all(
+            cls.is_valid_score(record.get(key))
+            for key in ("total", "correct", "hints_used", "score")
+        )
 
     @staticmethod
     def is_valid_score(value):
@@ -286,6 +333,7 @@ class QuizGame:
         return {
             "quizzes": [quiz.to_dict() for quiz in self.quizzes],
             "best_score": self.best_score,
+            "history": self.history,
         }
 
     def save_state(self):
@@ -300,6 +348,7 @@ class QuizGame:
     def reset_to_default(self):
         self.quizzes = create_default_quizzes()
         self.best_score = None
+        self.history = []
 
     def recover_from_corruption(self):
         """손상된 파일을 백업하고 기본 퀴즈 데이터로 초기화한다."""
