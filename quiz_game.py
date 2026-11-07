@@ -30,6 +30,7 @@ class QuizGame:
             (2, "퀴즈 추가", self.add_quiz),
             (3, "퀴즈 목록", self.list_quizzes),
             (4, "점수 확인", self.show_score),
+            (5, "퀴즈 삭제", self.delete_quiz),
             (0, "종료", self.quit),
         ]
 
@@ -215,6 +216,33 @@ class QuizGame:
         for number, quiz in enumerate(self.quizzes, start=1):
             quiz.display(number)
             print(f"  -> 정답: {quiz.answer}번")
+            if quiz.has_hint():
+                print(f"  -> 힌트: {quiz.hint}")
+
+    def delete_quiz(self):
+        """번호를 골라 퀴즈를 삭제하고 파일에 반영한다. 0을 입력하면 취소한다."""
+        if not self.quizzes:
+            print("[안내] 삭제할 퀴즈가 없습니다.")
+            return
+
+        print(f"\n=== 퀴즈 삭제 (총 {len(self.quizzes)}문제) ===")
+        for number, quiz in enumerate(self.quizzes, start=1):
+            print(f"  {number}. {quiz.question}")
+        index = self.console.read_number(
+            "삭제할 퀴즈 번호 (취소: 0): ", 0, len(self.quizzes)
+        )
+        if index == 0:
+            print("[안내] 삭제를 취소했습니다.")
+            return
+
+        target = self.quizzes[index - 1]
+        if not self.console.read_yes_no(f"'{target.question}' 퀴즈를 삭제할까요? (y/n): "):
+            print("[안내] 삭제를 취소했습니다.")
+            return
+
+        self.quizzes.pop(index - 1)
+        if self.save_state():
+            print(f"[안내] 퀴즈를 삭제했습니다. (남은 문제 {len(self.quizzes)}개)")
 
     # ------------------------------------------------------------ 상태 저장/불러오기
     def load_state(self):
