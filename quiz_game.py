@@ -1,5 +1,7 @@
 """게임 전체 흐름을 관리하는 QuizGame 클래스."""
 
+from default_quizzes import create_default_quizzes
+
 
 class QuizGame:
     """메뉴 표시, 사용자 입력, 각 기능 실행을 담당한다."""
@@ -13,6 +15,7 @@ class QuizGame:
     )
 
     def __init__(self):
+        self.quizzes = create_default_quizzes()
         self.running = True
 
     # ------------------------------------------------------------ 실행 흐름
