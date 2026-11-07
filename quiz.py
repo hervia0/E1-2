@@ -2,14 +2,15 @@
 
 
 class Quiz:
-    """문제(question), 선택지 4개(choices), 정답 번호 1~4(answer)를 가진 퀴즈."""
+    """문제(question), 선택지 4개(choices), 정답 번호 1~4(answer), 힌트(hint)를 가진 퀴즈."""
 
     CHOICE_COUNT = 4
 
-    def __init__(self, question, choices, answer):
+    def __init__(self, question, choices, answer, hint=""):
         self.question = question
         self.choices = list(choices)
         self.answer = answer
+        self.hint = hint
         self.validate()
 
     def validate(self):
@@ -25,6 +26,8 @@ class Quiz:
             raise ValueError("정답(answer)은 정수여야 합니다.")
         if not 1 <= self.answer <= self.CHOICE_COUNT:
             raise ValueError(f"정답(answer)은 1~{self.CHOICE_COUNT} 사이여야 합니다.")
+        if not isinstance(self.hint, str):
+            raise ValueError("힌트(hint)는 문자열이어야 합니다.")
 
     def display(self, number=None):
         """문제와 선택지를 화면에 출력한다."""
@@ -41,12 +44,16 @@ class Quiz:
         """정답 선택지의 내용을 반환한다."""
         return self.choices[self.answer - 1]
 
+    def has_hint(self):
+        return bool(self.hint.strip())
+
     def to_dict(self):
         """JSON으로 저장할 수 있도록 딕셔너리로 변환한다."""
         return {
             "question": self.question,
             "choices": list(self.choices),
             "answer": self.answer,
+            "hint": self.hint,
         }
 
     @classmethod
@@ -55,7 +62,8 @@ class Quiz:
         if not isinstance(data, dict):
             raise ValueError("퀴즈 데이터가 객체(dict) 형식이 아닙니다.")
         try:
-            return cls(data["question"], data["choices"], data["answer"])
+            # hint는 나중에 추가된 항목이므로, 예전 state.json에 없으면 빈 문자열로 둔다.
+            return cls(data["question"], data["choices"], data["answer"], data.get("hint", ""))
         except KeyError as error:
             raise ValueError(f"퀴즈 데이터에 {error} 항목이 없습니다.") from error
         except TypeError as error:
