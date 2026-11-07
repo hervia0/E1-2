@@ -16,6 +16,7 @@ class QuizGame:
     """
 
     POINTS_PER_QUESTION = 10
+    HINT_PENALTY = 5
 
     def __init__(self, storage=None, console=None):
         self.storage = storage or StateStorage()
@@ -84,32 +85,65 @@ class QuizGame:
         # random.sample: 원본 목록은 그대로 두고, 중복 없이 무작위로 total개를 뽑는다.
         questions = random.sample(self.quizzes, total)
         print(f"\n문제 순서는 무작위입니다. 정답 번호(1~{Quiz.CHOICE_COUNT})를 입력하세요.")
+        print(f"힌트가 필요하면 h를 입력하세요. (힌트를 보고 맞히면 {self.HINT_PENALTY}점 차감)")
 
         correct_count = 0
+        hints_used = 0
+        score = 0
         for number, quiz in enumerate(questions, start=1):
-            if self.ask_question(quiz, number):
+            is_correct, used_hint = self.ask_question(quiz, number)
+            if used_hint:
+                hints_used += 1
+            if is_correct:
                 correct_count += 1
+                score += self.question_points(used_hint)
 
-        score = correct_count * self.POINTS_PER_QUESTION
-        self.show_result(correct_count, total, score)
+        self.show_result(correct_count, total, hints_used, score)
         self.update_best_score(score)
 
     def ask_question(self, quiz, number):
-        """문제 하나를 출제하고 정답 여부를 반환한다."""
+        """문제 하나를 출제하고 (정답 여부, 힌트 사용 여부)를 반환한다."""
         quiz.display(number)
-        user_answer = self.console.read_number("정답: ", 1, Quiz.CHOICE_COUNT)
-        if quiz.is_correct(user_answer):
-            print("  [O] 정답입니다!")
-            return True
-        print(f"  [X] 오답입니다. 정답은 {quiz.answer}번 ({quiz.correct_choice()}) 입니다.")
-        return False
+        used_hint = False
+        while True:
+            answer = self.console.read_number_or_command(
+                "정답(힌트: h): ", 1, Quiz.CHOICE_COUNT, commands=("h",)
+            )
+            if answer != "h":
+                break
+            used_hint = self.show_hint(quiz, used_hint)
 
-    def show_result(self, correct_count, total, score):
+        if quiz.is_correct(answer):
+            points = self.question_points(used_hint)
+            print(f"  [O] 정답입니다! (+{points}점)")
+            return True, used_hint
+        print(f"  [X] 오답입니다. 정답은 {quiz.answer}번 ({quiz.correct_choice()}) 입니다.")
+        return False, used_hint
+
+    def show_hint(self, quiz, already_used):
+        """힌트를 출력하고, 이번 문제에서 힌트를 사용했는지 여부를 반환한다."""
+        if not quiz.has_hint():
+            print("  [안내] 이 문제에는 힌트가 없습니다.")
+            return already_used
+        if already_used:
+            print(f"  [힌트] {quiz.hint}")
+        else:
+            print(f"  [힌트] {quiz.hint}  (이 문제는 맞혀도 {self.HINT_PENALTY}점 차감)")
+        return True
+
+    def question_points(self, used_hint):
+        """정답 1문제의 점수. 힌트를 사용했으면 차감한다."""
+        if used_hint:
+            return self.POINTS_PER_QUESTION - self.HINT_PENALTY
+        return self.POINTS_PER_QUESTION
+
+    def show_result(self, correct_count, total, hints_used, score):
         """퀴즈를 모두 푼 뒤 결과를 출력한다."""
         print("\n========== 결과 ==========")
         print(f"  맞힌 문제: {correct_count} / {total}")
         print(f"  정답률   : {correct_count / total * 100:.0f}%")
-        print(f"  점수     : {score}점")
+        print(f"  힌트 사용: {hints_used}회")
+        print(f"  점수     : {score}점 / {total * self.POINTS_PER_QUESTION}점 만점")
         print("==========================")
 
     def update_best_score(self, score):
@@ -130,7 +164,10 @@ class QuizGame:
         if self.best_score is None:
             print("[안내] 아직 퀴즈를 풀지 않았습니다. '퀴즈 풀기'로 도전해 보세요!")
             return
-        print(f"  최고 점수: {self.best_score}점 (문제당 {self.POINTS_PER_QUESTION}점)")
+        print(
+            f"  최고 점수: {self.best_score}점 "
+            f"(문제당 {self.POINTS_PER_QUESTION}점, 힌트 사용 시 -{self.HINT_PENALTY}점)"
+        )
 
     # ------------------------------------------------------------ 퀴즈 관리
     def add_quiz(self):
@@ -141,11 +178,14 @@ class QuizGame:
         answer = self.console.read_number(
             f"정답 번호 (1~{Quiz.CHOICE_COUNT}): ", 1, Quiz.CHOICE_COUNT
         )
-        new_quiz = Quiz(question, choices, answer)
+        hint = self.console.read_optional_text("힌트 (없으면 Enter): ")
+        new_quiz = Quiz(question, choices, answer, hint)
 
         print("\n[미리보기]")
         new_quiz.display()
         print(f"  정답: {answer}번")
+        if new_quiz.has_hint():
+            print(f"  힌트: {hint}")
         if not self.console.read_yes_no("이 퀴즈를 등록할까요? (y/n): "):
             print("[안내] 퀴즈 등록을 취소했습니다.")
             return
