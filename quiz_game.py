@@ -95,7 +95,33 @@ class QuizGame:
         print("==========================")
 
     def add_quiz(self):
-        print("[안내] 퀴즈 추가 기능은 준비 중입니다.")
+        """문제, 선택지 4개, 정답 번호를 입력받아 새 퀴즈를 등록하고 파일에 저장한다."""
+        print("\n=== 퀴즈 추가 ===")
+        question = self.read_text("문제: ")
+
+        choices = []
+        for index in range(1, Quiz.CHOICE_COUNT + 1):
+            while True:
+                choice = self.read_text(f"선택지 {index}: ")
+                if choice in choices:
+                    print("[안내] 이미 입력한 선택지와 같습니다. 다른 내용을 입력해 주세요.")
+                    continue
+                choices.append(choice)
+                break
+
+        answer = self.read_number(f"정답 번호 (1~{Quiz.CHOICE_COUNT}): ", 1, Quiz.CHOICE_COUNT)
+        new_quiz = Quiz(question, choices, answer)
+
+        print("\n[미리보기]")
+        new_quiz.display()
+        print(f"  정답: {answer}번")
+        if not self.read_yes_no("이 퀴즈를 등록할까요? (y/n): "):
+            print("[안내] 퀴즈 등록을 취소했습니다.")
+            return
+
+        self.quizzes.append(new_quiz)
+        if self.save_state():
+            print(f"[안내] 퀴즈가 등록되었습니다. (현재 {len(self.quizzes)}문제)")
 
     def list_quizzes(self):
         print("[안내] 퀴즈 목록 기능은 준비 중입니다.")
@@ -120,6 +146,24 @@ class QuizGame:
                 print(f"[안내] {minimum}~{maximum} 사이의 숫자를 입력해 주세요.")
                 continue
             return number
+
+    def read_text(self, prompt):
+        """앞뒤 공백을 제거한 문자열을 입력받는다. 빈 입력이면 다시 입력받는다."""
+        while True:
+            text = input(prompt).strip()
+            if text:
+                return text
+            print("[안내] 입력이 비어 있습니다. 다시 입력해 주세요.")
+
+    def read_yes_no(self, prompt):
+        """y/n 질문에 대한 답을 True/False로 반환한다."""
+        while True:
+            answer = input(prompt).strip().lower()
+            if answer in ("y", "yes", "예", "네"):
+                return True
+            if answer in ("n", "no", "아니오", "아니요"):
+                return False
+            print("[안내] y 또는 n으로 입력해 주세요.")
 
     # ------------------------------------------------------------ 파일 저장/불러오기
     def load_state(self):
