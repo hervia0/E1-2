@@ -53,7 +53,33 @@ class QuizGame:
 
     # ------------------------------------------------------------ 기능 (구현 예정)
     def play_quiz(self):
-        print("[안내] 퀴즈 풀기 기능은 준비 중입니다.")
+        """저장된 퀴즈를 차례로 출제하고, 정답 여부와 최종 결과를 보여준다."""
+        if not self.quizzes:
+            print("[안내] 등록된 퀴즈가 없습니다. 먼저 '퀴즈 추가'로 퀴즈를 등록해 주세요.")
+            return
+
+        total = len(self.quizzes)
+        print(f"\n=== 퀴즈 풀기 (총 {total}문제) ===")
+        print("정답 번호(1~4)를 입력하세요.")
+
+        correct_count = 0
+        for number, quiz in enumerate(self.quizzes, start=1):
+            quiz.display(number)
+            user_answer = self.read_number("정답: ", 1, quiz.CHOICE_COUNT)
+            if quiz.is_correct(user_answer):
+                correct_count += 1
+                print("  [O] 정답입니다!")
+            else:
+                print(f"  [X] 오답입니다. 정답은 {quiz.answer}번 ({quiz.correct_choice()}) 입니다.")
+
+        self.show_result(correct_count, total)
+
+    def show_result(self, correct_count, total):
+        """퀴즈를 모두 푼 뒤 결과를 출력한다."""
+        print("\n========== 결과 ==========")
+        print(f"  맞힌 문제: {correct_count} / {total}")
+        print(f"  정답률   : {correct_count / total * 100:.0f}%")
+        print("==========================")
 
     def add_quiz(self):
         print("[안내] 퀴즈 추가 기능은 준비 중입니다.")
