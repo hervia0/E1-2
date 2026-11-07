@@ -1,3 +1,139 @@
 # Python & Git 기초 퀴즈 게임
 
-Python 콘솔에서 동작하는 4지선다 퀴즈 게임입니다. (작성 중)
+## 1. 프로젝트 개요
+
+Python 콘솔에서 동작하는 **4지선다 퀴즈 게임**입니다.
+메뉴에서 번호를 골라 퀴즈를 풀고, 새 퀴즈를 등록하고, 목록과 최고 점수를 확인할 수 있습니다.
+추가한 퀴즈와 점수 기록은 프로젝트 루트의 `state.json`에 저장되므로 프로그램을 껐다 켜도 유지됩니다.
+
+- 외부 라이브러리 없이 Python 표준 라이브러리(`json`, `os`, `pathlib`, `random`, `datetime`)만 사용
+- 역할별로 클래스를 나눈 구조: `Quiz`(퀴즈 1개), `QuizGame`(게임 진행), `StateStorage`(파일 저장), `ConsoleInput`(입력 검증)
+
+## 2. 퀴즈 주제와 선정 이유
+
+**주제: Python & Git 기초**
+
+이 과제의 학습 목표가 바로 Python 기초 문법(자료형, 조건문, 반복문, 클래스, 파일 입출력, 예외 처리)과 Git 기본 명령어입니다.
+게임을 만들면서 배운 개념을 퀴즈로 다시 풀어보면 **만드는 과정과 복습이 동시에** 이루어진다고 생각해 이 주제를 골랐습니다.
+기본 퀴즈 8문제는 `int`/`str` 구분, 리스트 인덱싱, `dict`, `while`, `__init__`, `encoding="utf-8"`, `git pull`, `try/except`를 다룹니다.
+
+## 3. 실행 방법
+
+**요구 사항:** Python 3.10 이상 (외부 패키지 설치 불필요)
+
+```bash
+git clone https://github.com/hervia0/E1-2.git
+cd E1-2
+python main.py
+```
+
+> Windows에서 `python`이 동작하지 않으면 `py main.py`로 실행하세요.
+
+## 4. 기능 목록
+
+| 메뉴 | 기능 | 설명 |
+|---|---|---|
+| 1 | 퀴즈 풀기 | 풀 문제 수를 고르면 **무작위 순서**로 출제, 정답/오답 즉시 안내, 마지막에 결과(맞힌 수, 정답률, 점수) 표시 |
+| 2 | 퀴즈 추가 | 문제, 선택지 4개, 정답 번호, 힌트(선택)를 입력받아 미리보기 후 등록 → 즉시 파일 저장 |
+| 3 | 퀴즈 목록 | 등록된 모든 퀴즈의 문제, 선택지, 정답, 힌트 표시 |
+| 4 | 점수 확인 | 최고 점수와 플레이 횟수 표시 (아직 풀지 않았으면 안내) |
+| 5 | 퀴즈 삭제 | 번호로 퀴즈를 골라 확인 후 삭제 → 파일에 반영 (0 입력 시 취소) |
+| 6 | 게임 기록 | 모든 게임의 날짜/시간, 문제 수, 정답 수, 힌트 사용 수, 점수를 표로 표시 |
+| 0 | 종료 | 데이터를 저장하고 종료 |
+
+**점수 규칙**
+
+- 정답 1문제당 10점
+- 풀이 중 `h`를 입력하면 힌트를 볼 수 있으며, 힌트를 본 문제는 맞혀도 5점만 획득
+- 게임이 끝날 때마다 최고 점수와 비교해 더 높으면 갱신
+
+**입력 / 예외 처리**
+
+| 상황 | 동작 |
+|---|---|
+| 앞뒤 공백 (예: ` 1 `) | 공백을 제거한 뒤 처리 |
+| 빈 입력 (그냥 Enter) | 안내 후 다시 입력 |
+| 숫자가 아닌 입력 (예: `abc`) | 안내 후 다시 입력 |
+| 범위 밖 숫자 (예: 메뉴 `9`, 정답 `0`) | 허용 범위를 안내 후 다시 입력 |
+| 중복된 선택지 입력 | 안내 후 다시 입력 |
+| `Ctrl+C` / 입력 스트림 종료(EOF) | 안내 메시지 출력 → 데이터 저장 → 정상 종료 |
+| `state.json` 없음 (첫 실행) | 기본 퀴즈 데이터로 시작하고 파일 생성 |
+| `state.json` 손상 (JSON 오류, 잘못된 형식, UTF-8 아님) | 경고 출력 → 기존 파일을 `state.json.bak`으로 백업 → 기본 데이터로 복구 |
+| 파일 저장 실패 (권한 등) | 오류 안내 후 프로그램은 계속 실행 |
+
+## 5. 파일 구조
+
+```
+E1-2/
+├── main.py             # 실행 진입점: QuizGame을 만들고 run() 호출
+├── quiz.py             # Quiz 클래스: 문제/선택지/정답/힌트, 출력·정답 확인·dict 변환
+├── quiz_game.py        # QuizGame 클래스: 메뉴, 퀴즈 풀기/추가/목록/삭제, 점수·기록 관리
+├── storage.py          # StateStorage 클래스: state.json 읽기/쓰기, 손상 파일 백업
+├── console_input.py    # ConsoleInput 클래스: 공백 제거, 빈 입력·숫자·범위 검증
+├── default_quizzes.py  # 기본 퀴즈 8개 (Quiz 인스턴스로 생성)
+├── state.json          # 실행 시 자동 생성되는 데이터 파일 (Git 추적 제외)
+├── .gitignore
+└── README.md
+```
+
+**클래스 역할**
+
+| 클래스 | 속성 | 주요 메서드 |
+|---|---|---|
+| `Quiz` | `question`, `choices`, `answer`, `hint` | `display()`, `is_correct()`, `has_hint()`, `to_dict()`, `from_dict()` |
+| `QuizGame` | `quizzes`, `best_score`, `history`, `storage`, `console` | `run()`, `show_menu()`, `play_quiz()`, `add_quiz()`, `list_quizzes()`, `show_score()`, `delete_quiz()`, `show_history()`, `load_state()`, `save_state()` |
+| `StateStorage` | `path` | `load()`, `save()`, `backup_corrupted()` |
+| `ConsoleInput` | - | `read_text()`, `read_number()`, `read_number_or_command()`, `read_yes_no()` |
+
+## 6. 데이터 파일 설명 (`state.json`)
+
+- **경로:** 프로젝트 루트의 `state.json` (`storage.py`가 있는 폴더 기준이므로 어느 위치에서 실행해도 같은 파일 사용)
+- **역할:** 퀴즈 목록, 최고 점수, 게임 기록을 저장해 프로그램을 다시 실행해도 유지
+- **인코딩:** UTF-8 (`ensure_ascii=False`로 한글을 그대로 저장)
+- **저장 시점:** 퀴즈 추가/삭제 직후, 게임 종료 직후, 메뉴 0번 종료 시, `Ctrl+C`/EOF로 종료될 때
+- **안전한 저장:** `state.json.tmp`에 먼저 쓴 뒤 `os.replace()`로 교체하여, 저장 도중 문제가 생겨도 기존 파일이 깨지지 않음
+- **Git:** 실행할 때마다 바뀌는 개인 데이터이므로 `.gitignore`로 추적에서 제외 (없으면 첫 실행 때 자동 생성)
+
+**스키마**
+
+| 키 | 타입 | 설명 |
+|---|---|---|
+| `quizzes` | list | 퀴즈 목록 |
+| `quizzes[].question` | str | 문제 |
+| `quizzes[].choices` | list[str] | 선택지 4개 |
+| `quizzes[].answer` | int | 정답 번호 (1~4) |
+| `quizzes[].hint` | str | 힌트 (없으면 `""`) |
+| `best_score` | int 또는 null | 최고 점수 (아직 풀지 않았으면 `null`) |
+| `history` | list | 게임 기록 (오래된 순) |
+| `history[].played_at` | str | 플레이 날짜/시간 (`YYYY-MM-DD HH:MM:SS`) |
+| `history[].total` | int | 푼 문제 수 |
+| `history[].correct` | int | 맞힌 문제 수 |
+| `history[].hints_used` | int | 힌트 사용 횟수 |
+| `history[].score` | int | 점수 |
+
+**예시**
+
+```json
+{
+  "quizzes": [
+    {
+      "question": "키(key)와 값(value)을 쌍으로 저장하는 자료형은?",
+      "choices": ["list", "tuple", "dict", "str"],
+      "answer": 3,
+      "hint": "중괄호 {}로 만들고, d[\"key\"]처럼 꺼냅니다."
+    }
+  ],
+  "best_score": 70,
+  "history": [
+    {
+      "played_at": "2026-11-07 20:30:00",
+      "total": 8,
+      "correct": 7,
+      "hints_used": 0,
+      "score": 70
+    }
+  ]
+}
+```
+
+`hint`, `history`는 나중에 추가된 항목이라 없는 예전 파일도 그대로 읽을 수 있습니다.
