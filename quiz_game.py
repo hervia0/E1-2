@@ -1,5 +1,7 @@
 """게임 전체 흐름을 관리하는 QuizGame 클래스."""
 
+import random
+
 from console_input import ConsoleInput
 from default_quizzes import create_default_quizzes
 from quiz import Quiz
@@ -76,12 +78,15 @@ class QuizGame:
             print("[안내] 등록된 퀴즈가 없습니다. 먼저 '퀴즈 추가'로 퀴즈를 등록해 주세요.")
             return
 
-        total = len(self.quizzes)
-        print(f"\n=== 퀴즈 풀기 (총 {total}문제) ===")
-        print("정답 번호(1~4)를 입력하세요.")
+        available = len(self.quizzes)
+        print(f"\n=== 퀴즈 풀기 (등록된 문제 {available}개) ===")
+        total = self.console.read_number(f"몇 문제를 풀까요? (1~{available}): ", 1, available)
+        # random.sample: 원본 목록은 그대로 두고, 중복 없이 무작위로 total개를 뽑는다.
+        questions = random.sample(self.quizzes, total)
+        print(f"\n문제 순서는 무작위입니다. 정답 번호(1~{Quiz.CHOICE_COUNT})를 입력하세요.")
 
         correct_count = 0
-        for number, quiz in enumerate(self.quizzes, start=1):
+        for number, quiz in enumerate(questions, start=1):
             if self.ask_question(quiz, number):
                 correct_count += 1
 
