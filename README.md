@@ -48,12 +48,12 @@ python main.py
 
 | 메뉴 | 기능 | 설명 |
 |---|---|---|
-| 1 | 퀴즈 풀기 | 풀 문제 수를 고르면 **무작위 순서**로 출제, 정답/오답 즉시 안내, 마지막에 결과(맞힌 수, 정답률, 점수) 표시 |
-| 2 | 퀴즈 추가 | 문제, 선택지 4개, 정답 번호, 힌트(선택)를 입력받아 미리보기 후 등록 → 즉시 파일 저장 |
+| 1 | 퀴즈 풀기 | **학년 선택**(0: 전체, 1~11: 초1~고2, 학년별 문제 수 표시) → 풀 문제 수 선택 → 해당 학년 문제를 **무작위 순서**로 출제, 정답/오답 즉시 안내, 마지막에 결과(학년, 맞힌 수, 정답률, 점수) 표시 |
+| 2 | 퀴즈 추가 | 학년(0: 미분류), 문제, 선택지 4개, 정답 번호, 힌트(선택)를 입력받아 미리보기 후 등록 → 즉시 파일 저장 (문제 앞에 `[학년]` 자동 표기) |
 | 3 | 퀴즈 목록 | 등록된 모든 퀴즈의 문제, 선택지, 정답, 힌트 표시 |
-| 4 | 점수 확인 | 최고 점수와 플레이 횟수 표시 (아직 풀지 않았으면 안내) |
+| 4 | 점수 확인 | 최고 점수, 플레이 횟수, **학년별 최고 기록** 표시 (아직 풀지 않았으면 안내) |
 | 5 | 퀴즈 삭제 | 번호로 퀴즈를 골라 확인 후 삭제 → 파일에 반영 (0 입력 시 취소) |
-| 6 | 게임 기록 | 모든 게임의 날짜/시간, 문제 수, 정답 수, 힌트 사용 수, 점수를 표로 표시 |
+| 6 | 게임 기록 | 모든 게임의 날짜/시간, 학년, 문제 수, 정답 수, 힌트 사용 수, 점수를 표로 표시 |
 | 0 | 종료 | 데이터를 저장하고 종료 |
 
 **점수 규칙**
@@ -95,8 +95,8 @@ E1-2/
 
 | 클래스 | 속성 | 주요 메서드 |
 |---|---|---|
-| `Quiz` | `question`, `choices`, `answer`, `hint` | `display()`, `is_correct()`, `has_hint()`, `to_dict()`, `from_dict()` |
-| `QuizGame` | `quizzes`, `best_score`, `history`, `storage`, `console` | `run()`, `show_menu()`, `play_quiz()`, `add_quiz()`, `list_quizzes()`, `show_score()`, `delete_quiz()`, `show_history()`, `load_state()`, `save_state()` |
+| `Quiz` | `question`, `choices`, `answer`, `hint`, `grade` | `display()`, `is_correct()`, `has_hint()`, `to_dict()`, `from_dict()`, `guess_grade()` |
+| `QuizGame` | `quizzes`, `best_score`, `history`, `storage`, `console` | `run()`, `show_menu()`, `play_quiz()`, `select_grade()`, `add_quiz()`, `list_quizzes()`, `show_score()`, `delete_quiz()`, `show_history()`, `load_state()`, `save_state()` |
 | `StateStorage` | `path` | `load()`, `save()`, `backup_corrupted()` |
 | `ConsoleInput` | - | `read_text()`, `read_number()`, `read_number_or_command()`, `read_yes_no()` |
 
@@ -118,9 +118,11 @@ E1-2/
 | `quizzes[].choices` | list[str] | 선택지 4개 |
 | `quizzes[].answer` | int | 정답 번호 (1~4) |
 | `quizzes[].hint` | str | 힌트 (없으면 `""`) |
+| `quizzes[].grade` | str | 학년 `초1`~`초6`, `중1`~`중3`, `고1`, `고2` (미분류면 `""`) |
 | `best_score` | int 또는 null | 최고 점수 (아직 풀지 않았으면 `null`) |
 | `history` | list | 게임 기록 (오래된 순) |
 | `history[].played_at` | str | 플레이 날짜/시간 (`YYYY-MM-DD HH:MM:SS`) |
+| `history[].grade` | str | 선택한 학년 (`전체` 또는 `초1`~`고2`) |
 | `history[].total` | int | 푼 문제 수 |
 | `history[].correct` | int | 맞힌 문제 수 |
 | `history[].hints_used` | int | 힌트 사용 횟수 |
@@ -135,13 +137,15 @@ E1-2/
       "question": "[초5-1 · 약수와 배수] 12와 18의 최대공약수는?",
       "choices": ["3", "9", "36", "6"],
       "answer": 4,
-      "hint": "12와 18을 모두 나누어떨어지게 하는 수 중 가장 큰 수입니다. (36은 최소공배수)"
+      "hint": "12와 18을 모두 나누어떨어지게 하는 수 중 가장 큰 수입니다. (36은 최소공배수)",
+      "grade": "초5"
     }
   ],
   "best_score": 170,
   "history": [
     {
       "played_at": "2026-11-21 20:30:00",
+      "grade": "전체",
       "total": 20,
       "correct": 18,
       "hints_used": 2,
@@ -151,4 +155,5 @@ E1-2/
 }
 ```
 
-`hint`, `history`는 나중에 추가된 항목이라 없는 예전 파일도 그대로 읽을 수 있습니다.
+`hint`, `grade`, `history`는 나중에 추가된 항목이라 없는 예전 파일도 그대로 읽을 수 있습니다.
+`grade`가 없는 퀴즈는 문제 앞의 `[초3-2 · 분수]` 같은 표기에서 학년을 추정하고, 표기가 없으면 미분류로 둡니다.
