@@ -283,9 +283,10 @@ QUIZ_DATA = [
 def create_default_quizzes():
     """QUIZ_DATA를 Quiz 인스턴스 목록으로 만들어 반환한다.
 
-    문제 앞에는 [학년 · 단원]을 붙여 난이도와 범위를 알 수 있게 한다.
+    문제 앞에는 [학년 · 단원]을 붙여 난이도와 범위를 알 수 있게 하고,
+    학년 선택 출제를 위해 grade 속성에는 앞 두 글자(예: "초3-2" -> "초3", "고2 수학Ⅰ" -> "고2")를 저장한다.
     """
     return [
-        Quiz(f"[{grade} · {unit}] {question}", choices, answer, hint)
+        Quiz(f"[{grade} · {unit}] {question}", choices, answer, hint, grade[:2])
         for grade, unit, question, choices, answer, hint in QUIZ_DATA
     ]
