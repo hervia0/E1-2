@@ -53,7 +53,7 @@ class QuizGame:
 
     def show_title(self):
         print("=" * 40)
-        print("   Python & Git 기초 퀴즈 게임")
+        print("   초1~고2 수학 퀴즈 게임")
         print("=" * 40)
 
     def show_menu(self):
