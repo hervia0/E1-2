@@ -1,12 +1,15 @@
 """게임 전체 흐름을 관리하는 QuizGame 클래스."""
 
 import random
+import unicodedata
 from datetime import datetime
 
 from console_input import ConsoleInput
 from default_quizzes import create_default_quizzes
-from quiz import Quiz
+from quiz import GRADES, Quiz
 from storage import StateLoadError, StateSaveError, StateStorage
+
+ALL_GRADES_LABEL = "전체"
 
 
 class QuizGame:
@@ -24,7 +27,8 @@ class QuizGame:
         self.console = console or ConsoleInput()
         self.quizzes = []
         self.best_score = None  # 아직 퀴즈를 풀지 않았으면 None
-        self.history = []  # 게임 1회 = {"played_at", "total", "correct", "hints_used", "score"}
+        # 게임 1회 = {"played_at", "grade", "total", "correct", "hints_used", "score"}
+        self.history = []
         self.running = True
         # (메뉴 번호, 이름, 실행할 메서드) - 메뉴를 추가할 때 여기만 고치면 된다.
         self.menu_items = [
@@ -83,11 +87,13 @@ class QuizGame:
             print("[안내] 등록된 퀴즈가 없습니다. 먼저 '퀴즈 추가'로 퀴즈를 등록해 주세요.")
             return
 
-        available = len(self.quizzes)
-        print(f"\n=== 퀴즈 풀기 (등록된 문제 {available}개) ===")
+        print("\n=== 퀴즈 풀기 ===")
+        grade_label, pool = self.select_grade()
+        available = len(pool)
+        print(f"\n[{grade_label}] 문제 {available}개 중에서 출제합니다.")
         total = self.console.read_number(f"몇 문제를 풀까요? (1~{available}): ", 1, available)
         # random.sample: 원본 목록은 그대로 두고, 중복 없이 무작위로 total개를 뽑는다.
-        questions = random.sample(self.quizzes, total)
+        questions = random.sample(pool, total)
         print(f"\n문제 순서는 무작위입니다. 정답 번호(1~{Quiz.CHOICE_COUNT})를 입력하세요.")
         print(f"힌트가 필요하면 h를 입력하세요. (힌트를 보고 맞히면 {self.HINT_PENALTY}점 차감)")
 
@@ -102,9 +108,49 @@ class QuizGame:
                 correct_count += 1
                 score += self.question_points(used_hint)
 
-        self.show_result(correct_count, total, hints_used, score)
-        self.record_history(total, correct_count, hints_used, score)
+        self.show_result(grade_label, correct_count, total, hints_used, score)
+        self.record_history(grade_label, total, correct_count, hints_used, score)
         self.update_best_score(score)  # 최고 점수 비교 후 기록과 함께 저장
+
+    # ------------------------------------------------------------ 학년 선택
+    def count_by_grade(self):
+        """학년별 퀴즈 개수를 {학년: 개수} 딕셔너리로 반환한다."""
+        counts = {}
+        for quiz in self.quizzes:
+            counts[quiz.grade] = counts.get(quiz.grade, 0) + 1
+        return counts
+
+    def show_grade_options(self, zero_label, with_counts=True):
+        """0번(zero_label)과 1~11번 학년 목록을 한 줄에 4개씩 출력한다."""
+        counts = self.count_by_grade()
+        if with_counts:
+            print(f"   0. {zero_label} ({len(self.quizzes)}문제)")
+        else:
+            print(f"   0. {zero_label}")
+        cells = []
+        for number, grade in enumerate(GRADES, start=1):
+            cell = f"{number:>4}. {grade}"
+            if with_counts:
+                cell += f" ({counts.get(grade, 0):>2}문제)"
+            cells.append(cell)
+        for start in range(0, len(cells), 4):
+            print("".join(cells[start:start + 4]))
+
+    def select_grade(self):
+        """학년을 선택받아 (학년 이름, 해당 학년 퀴즈 목록)을 반환한다. 0번은 전체."""
+        print("\n--- 학년 선택 ---")
+        self.show_grade_options(ALL_GRADES_LABEL)
+        while True:
+            choice = self.console.read_number(
+                f"학년 번호를 선택하세요 (0~{len(GRADES)}): ", 0, len(GRADES)
+            )
+            if choice == 0:
+                return ALL_GRADES_LABEL, list(self.quizzes)
+            grade = GRADES[choice - 1]
+            pool = [quiz for quiz in self.quizzes if quiz.grade == grade]
+            if pool:
+                return grade, pool
+            print(f"[안내] {grade} 퀴즈가 없습니다. 다른 학년을 선택해 주세요.")
 
     def ask_question(self, quiz, number):
         """문제 하나를 출제하고 (정답 여부, 힌트 사용 여부)를 반환한다."""
@@ -142,9 +188,10 @@ class QuizGame:
             return self.POINTS_PER_QUESTION - self.HINT_PENALTY
         return self.POINTS_PER_QUESTION
 
-    def show_result(self, correct_count, total, hints_used, score):
+    def show_result(self, grade_label, correct_count, total, hints_used, score):
         """퀴즈를 모두 푼 뒤 결과를 출력한다."""
         print("\n========== 결과 ==========")
+        print(f"  학년     : {grade_label}")
         print(f"  맞힌 문제: {correct_count} / {total}")
         print(f"  정답률   : {correct_count / total * 100:.0f}%")
         print(f"  힌트 사용: {hints_used}회")
@@ -163,11 +210,12 @@ class QuizGame:
             print(f"[안내] 현재 최고 점수는 {self.best_score}점입니다.")
         self.save_state()
 
-    def record_history(self, total, correct_count, hints_used, score):
-        """게임 1회의 결과를 날짜/시간과 함께 기록 목록에 추가한다."""
+    def record_history(self, grade_label, total, correct_count, hints_used, score):
+        """게임 1회의 결과를 날짜/시간, 선택한 학년과 함께 기록 목록에 추가한다."""
         self.history.append(
             {
                 "played_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "grade": grade_label,
                 "total": total,
                 "correct": correct_count,
                 "hints_used": hints_used,
@@ -185,8 +233,28 @@ class QuizGame:
             f"  최고 점수: {self.best_score}점 "
             f"(문제당 {self.POINTS_PER_QUESTION}점, 힌트 사용 시 -{self.HINT_PENALTY}점)"
         )
-        if self.history:
-            print(f"  플레이 횟수: {len(self.history)}회 (자세한 내용은 '게임 기록' 메뉴)")
+        if not self.history:
+            return
+        print(f"  플레이 횟수: {len(self.history)}회 (자세한 내용은 '게임 기록' 메뉴)")
+
+        best_by_grade = self.best_scores_by_grade()
+        print("\n  [학년별 최고 기록]")
+        for grade in (ALL_GRADES_LABEL,) + GRADES:
+            if grade in best_by_grade:
+                record = best_by_grade[grade]
+                print(
+                    f"   {self.pad(grade, 4)}  {record['score']:>4}점  "
+                    f"({record['correct']}/{record['total']}문제 정답)"
+                )
+
+    def best_scores_by_grade(self):
+        """게임 기록에서 학년별로 점수가 가장 높은 기록을 골라 {학년: 기록}으로 반환한다."""
+        best = {}
+        for record in self.history:
+            grade = record.get("grade", ALL_GRADES_LABEL)  # 학년 선택 이전 기록은 전체로 본다.
+            if grade not in best or record["score"] > best[grade]["score"]:
+                best[grade] = record
+        return best
 
     def show_history(self):
         """지금까지의 모든 게임 기록을 오래된 순서로 보여준다."""
@@ -194,28 +262,51 @@ class QuizGame:
         if not self.history:
             print("[안내] 아직 게임 기록이 없습니다.")
             return
-        # 한글은 화면에서 2칸을 차지하므로 머리글은 칸 수를 맞춘 고정 문자열로 출력한다.
-        print("   No  날짜/시간            문제수  정답  힌트  점수")
+        print(
+            f"   No  {self.pad('날짜/시간', 19)}  {self.pad('학년', 4)}  "
+            f"{self.pad('문제수', 6)}  정답  힌트  점수"
+        )
         for number, record in enumerate(self.history, start=1):
+            grade = record.get("grade", ALL_GRADES_LABEL)
             print(
-                f"  {number:>3}  {record['played_at']:<19}  {record['total']:>6}  "
-                f"{record['correct']:>4}  {record['hints_used']:>4}  {record['score']:>4}"
+                f"  {number:>3}  {record['played_at']:<19}  {self.pad(grade, 4)}  "
+                f"{record['total']:>6}  {record['correct']:>4}  "
+                f"{record['hints_used']:>4}  {record['score']:>4}"
             )
+
+    @staticmethod
+    def pad(text, width):
+        """한글처럼 화면에서 2칸을 차지하는 글자를 고려해 text를 width칸에 맞춰 왼쪽 정렬한다."""
+        display_width = sum(
+            2 if unicodedata.east_asian_width(char) in ("W", "F") else 1 for char in text
+        )
+        return text + " " * max(0, width - display_width)
 
     # ------------------------------------------------------------ 퀴즈 관리
     def add_quiz(self):
         """문제, 선택지 4개, 정답 번호를 입력받아 새 퀴즈를 등록하고 파일에 저장한다."""
         print("\n=== 퀴즈 추가 ===")
+        print("이 퀴즈의 학년(난이도)을 선택하세요.")
+        self.show_grade_options("미분류 (학년 지정 안 함)", with_counts=False)
+        grade_number = self.console.read_number(
+            f"학년 번호 (0~{len(GRADES)}): ", 0, len(GRADES)
+        )
+        grade = GRADES[grade_number - 1] if grade_number else ""
+
         question = self.console.read_text("문제: ")
+        if grade:
+            # 기본 퀴즈와 같은 형식으로 문제 앞에 [학년]을 붙인다.
+            question = f"[{grade}] {question}"
         choices = self.read_choices()
         answer = self.console.read_number(
             f"정답 번호 (1~{Quiz.CHOICE_COUNT}): ", 1, Quiz.CHOICE_COUNT
         )
         hint = self.console.read_optional_text("힌트 (없으면 Enter): ")
-        new_quiz = Quiz(question, choices, answer, hint)
+        new_quiz = Quiz(question, choices, answer, hint, grade)
 
         print("\n[미리보기]")
         new_quiz.display()
+        print(f"  학년: {new_quiz.grade_label()}")
         print(f"  정답: {answer}번")
         if new_quiz.has_hint():
             print(f"  힌트: {hint}")
@@ -318,6 +409,9 @@ class QuizGame:
     @classmethod
     def is_valid_record(cls, record):
         if not isinstance(record, dict) or not isinstance(record.get("played_at"), str):
+            return False
+        # grade는 학년 선택 기능과 함께 추가된 항목이므로 없어도 된다.
+        if "grade" in record and not isinstance(record["grade"], str):
             return False
         return all(
             cls.is_valid_score(record.get(key))
